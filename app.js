@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const https = require("https");
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -20,9 +21,7 @@ const shopController = require("./controllers/shop");
 const isAuth = require("./middleware/is-auth");
 const User = require("./models/user");
 
-console.log("process.env>>>>>>>>>>>>>>>",process.env);
-
-const MONGODB_URL = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@cluster0.tnnqc.mongodb.net/${process.env.MONGO_DEFAULT_DATABASE}?retryWrites=true&w=majority`;
+const MONGODB_URL = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@cluster0.tnnqc.mongodb.net/${process.env.MONGO_DEFAULT_DATABASE.toLowerCase()}`;
 const app = express();
 const store = new MongoDBStore({
   uri: MONGODB_URL,
@@ -30,6 +29,9 @@ const store = new MongoDBStore({
 });
 
 const csrfProtection = csrf();
+
+const privateKey = fs.readFileSync("server.key");
+const certificate = fs.readFileSync("server.cert");
 
 const fileStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -66,7 +68,7 @@ const accessLogStream = fs.createWriteStream(
 
 app.use(helmet());
 app.use(compression());
-app.use(morgan("combined",{stream:accessLogStream}));
+app.use(morgan("combined", { stream: accessLogStream }));
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(
@@ -135,7 +137,9 @@ app.use((error, req, res, next) => {
 mongoose
   .connect(MONGODB_URL)
   .then((result) => {
-    app.listen(process.env.PORT || 3000);
+    https
+      .createServer({ key: privateKey, cert: certificate }, app)
+      .listen(process.env.PORT || 3000);
     console.log("Connected!");
   })
   .catch((err) => {
